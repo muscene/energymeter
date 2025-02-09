@@ -188,7 +188,7 @@ def get_meter_status():
 
 
 
-MODEL_FILENAME = "customer_payment_model.pkl"
+MODEL_FILENAME = "optimized_customer_payment_model.pkl"
 try:
     loaded_model = joblib.load(MODEL_FILENAME)
 except ValueError as e:
