@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Energy Meter Management</title>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.0.3/dist/tailwind.min.css" rel="stylesheet">
+</head>
+<body class="bg-gray-100">
+    <div class="flex h-screen">
+        <!-- Side Navigation -->
+        <div class="w-64 bg-gray-800 text-white">
+            <div class="p-4">
+                <h1 class="text-2xl font-bold mb-8">Energy Meter</h1>
+                <nav>
+                    <ul class="space-y-2">
+                        <li>
+                            <a href="#dashboard" class="nav-link block py-2 px-4 rounded hover:bg-gray-700" data-section="dashboard">
+                                Dashboard
+                            </a>
+                        </li>
+                        <li>
+                            <a href="#register" class="nav-link block py-2 px-4 rounded hover:bg-gray-700" data-section="register">
+                                Register Meter
+                            </a>
+                        </li>
+                        <li>
+                            <a href="#recharge" class="nav-link block py-2 px-4 rounded hover:bg-gray-700" data-section="recharge">
+                                Recharge Meter
+                            </a>
+                        </li>
+                        <li>
+                            <a href="#meters" class="nav-link block py-2 px-4 rounded hover:bg-gray-700" data-section="meters">
+                                View Meters
+                            </a>
+                        </li>
+                        <li>
+                            <a href="#history" class="nav-link block py-2 px-4 rounded hover:bg-gray-700" data-section="history">
+                                Recharge History
+                            </a>
+                        </li>
+                    </ul>
+                </nav>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="flex-1 overflow-y-auto">
+            <div class="container mx-auto p-8">
+                <!-- Dashboard Section -->
+                <section id="dashboard" class="section">
+                    <h2 class="text-3xl font-bold mb-6">Dashboard</h2>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <!-- Meter Status Card -->
+                        <div class="bg-white p-6 rounded-lg shadow-md">
+                            <h3 class="text-xl font-semibold mb-4">Meter Status</h3>
+                            <div id="meterStatus">
+                                <p class="mb-2">Balance: <span id="balance" class="font-bold">Loading...</span></p>
+                                <p class="mb-2">Consumption: <span id="consumption" class="font-bold">Loading...</span></p>
+                                <p>Status: <span id="status" class="font-bold">Loading...</span></p>
+                            </div>
+                        </div>
+                        <!-- Recharge Chart Card -->
+                        <div class="bg-white p-6 rounded-lg shadow-md md:col-span-2">
+                            <h3 class="text-xl font-semibold mb-4">Recharge History</h3>
+                            <canvas id="rechargeChart"></canvas>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Register Meter Section -->
+                <section id="register" class="section hidden">
+                    <h2 class="text-3xl font-bold mb-6">Register New Meter</h2>
+                    <div class="bg-white p-6 rounded-lg shadow-md">
+                        <form id="registerForm">
+                            <div class="mb-4">
+                                <label for="serial_number" class="block text-lg mb-2">Serial Number</label>
+                                <input type="text" id="serial_number" class="w-full p-2 border rounded" required>
+                            </div>
+                            <div class="mb-4">
+                                <label for="owner_name" class="block text-lg mb-2">Owner Name</label>
+                                <input type="text" id="owner_name" class="w-full p-2 border rounded" required>
+                            </div>
+                            <div class="mb-4">
+                                <label for="owner_contact" class="block text-lg mb-2">Owner Contact</label>
+                                <input type="text" id="owner_contact" class="w-full p-2 border rounded" required>
+                            </div>
+                            <button type="submit" class="bg-blue-500 text-white py-2 px-6 rounded hover:bg-blue-700">
+                                Register Meter
+                            </button>
+                        </form>
+                        <div id="registerResult" class="mt-4"></div>
+                    </div>
+                </section>
+
+                <!-- Recharge Meter Section -->
+                <section id="recharge" class="section hidden">
+                    <h2 class="text-3xl font-bold mb-6">Recharge Meter</h2>
+                    <div class="bg-white p-6 rounded-lg shadow-md">
+                        <form id="rechargeForm">
+                            <div class="mb-4">
+                                <label for="meter_serial_number" class="block text-lg mb-2">Meter Serial Number</label>
+                                <input type="text" id="meter_serial_number" class="w-full p-2 border rounded" required>
+                            </div>
+                            <div class="mb-4">
+                                <label for="recharge_amount" class="block text-lg mb-2">Recharge Amount</label>
+                                <input type="number" id="recharge_amount" class="w-full p-2 border rounded" required>
+                            </div>
+                            <button type="submit" class="bg-green-500 text-white py-2 px-6 rounded hover:bg-green-700">
+                                Recharge
+                            </button>
+                        </form>
+                        <div id="rechargeResult" class="mt-4"></div>
+                    </div>
+                </section>
+
+                <!-- View Meters Section -->
+                <section id="meters" class="section hidden">
+                    <h2 class="text-3xl font-bold mb-6">Registered Meters</h2>
+                    <div class="bg-white p-6 rounded-lg shadow-md">
+                        <button id="loadMetersButton" class="bg-gray-500 text-white py-2 px-6 rounded hover:bg-gray-700 mb-4">
+                            Refresh Meters List
+                        </button>
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full">
+                                <thead>
+                                    <tr class="bg-gray-100">
+                                        <th class="px-6 py-3 text-left">Serial Number</th>
+                                        <th class="px-6 py-3 text-left">Owner</th>
+                                        <th class="px-6 py-3 text-left">Contact</th>
+                                        <th class="px-6 py-3 text-left">Balance</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="metersList"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Recharge History Section -->
+                <section id="history" class="section hidden">
+                    <h2 class="text-3xl font-bold mb-6">Recharge History</h2>
+                    <div class="bg-white p-6 rounded-lg shadow-md">
+                        <div class="mb-4">
+                            <label for="recharge_serial_number" class="block text-lg mb-2">Meter Serial Number</label>
+                            <input type="text" id="recharge_serial_number" class="w-full p-2 border rounded" required>
+                        </div>
+                        <button id="loadRechargesButton" class="bg-gray-500 text-white py-2 px-6 rounded hover:bg-gray-700 mb-4">
+                            Load History
+                        </button>
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full">
+                                <thead>
+                                    <tr class="bg-gray-100">
+                                        <th class="px-6 py-3 text-left">Amount</th>
+                                        <th class="px-6 py-3 text-left">Date</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="rechargesList"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Navigation handling
+        document.querySelectorAll('.nav-link').forEach(link => {
+            link.addEventListener('click', function(e) {
+                e.preventDefault();
+                const targetSection = this.getAttribute('data-section');
+                
+                // Hide all sections
+                document.querySelectorAll('.section').forEach(section => {
+                    section.classList.add('hidden');
+                });
+                
+                // Show target section
+                document.getElementById(targetSection).classList.remove('hidden');
+                
+                // Update active state
+                document.querySelectorAll('.nav-link').forEach(link => {
+                    link.classList.remove('bg-gray-700');
+                });
+                this.classList.add('bg-gray-700');
+            });
+        });
+
+        // Show dashboard by default
+        document.querySelector('[data-section="dashboard"]').click();
+
+        // Fetch meter status
+        function fetchMeterStatus() {
+            const serialNumber = "123456"; // Replace with actual serial number
+            axios.get(`/api/meter_status?serial_number=${serialNumber}`)
+                .then(response => {
+                    const data = response.data;
+                    document.getElementById('balance').innerText = data.balance;
+                    document.getElementById('consumption').innerText = data.consumption;
+                    document.getElementById('status').innerText = data.status;
+                })
+                .catch(error => {
+                    console.error('Error fetching meter status:', error);
+                });
+        }
+
+        // Register meter form handler
+        document.getElementById('registerForm').addEventListener('submit', function(event) {
+            event.preventDefault();
+            const formData = {
+                serial_number: document.getElementById('serial_number').value,
+                owner_name: document.getElementById('owner_name').value,
+                owner_contact: document.getElementById('owner_contact').value
+            };
+
+            axios.post('/api/register', formData)
+                .then(response => {
+                    document.getElementById('registerResult').innerHTML = 
+                        `<div class="text-green-600">${response.data.message}</div>`;
+                    this.reset();
+                })
+                .catch(error => {
+                    document.getElementById('registerResult').innerHTML = 
+                        `<div class="text-red-600">${error.response.data.error}</div>`;
+                });
+        });
+
+        // Recharge meter form handler
+        document.getElementById('rechargeForm').addEventListener('submit', function(event) {
+            event.preventDefault();
+            const formData = {
+                meter_serial_number: document.getElementById('meter_serial_number').value,
+                recharge_amount: document.getElementById('recharge_amount').value
+            };
+
+            axios.post('/api/recharge', formData)
+                .then(response => {
+                    document.getElementById('rechargeResult').innerHTML = 
+                        `<div class="text-green-600">
+                            ${response.data.message}<br>
+                            New Balance: ${response.data.new_balance}
+                        </div>`;
+                    this.reset();
+                    loadRechargeChart(); // Refresh chart
+                })
+                .catch(error => {
+                    document.getElementById('rechargeResult').innerHTML = 
+                        `<div class="text-red-600">${error.response.data.error}</div>`;
+                });
+        });
+
+        // Load meters list
+        document.getElementById('loadMetersButton').addEventListener('click', function() {
+            axios.get('/api/registered_meters')
+                .then(response => {
+                    const metersList = document.getElementById('metersList');
+                    metersList.innerHTML = '';
+                    response.data.forEach(meter => {
+                        metersList.innerHTML += `
+                            <tr class="border-t">
+                                <td class="px-6 py-4">${meter[0]}</td>
+                                <td class="px-6 py-4">${meter[1]}</td>
+                                <td class="px-6 py-4">${meter[2]}</td>
+                                <td class="px-6 py-4">${meter[3]}</td>
+                            </tr>`;
+                    });
+                })
+                .catch(error => {
+                    console.error('Error loading meters:', error);
+                });
+        });
+
+        // Load recharge history
+        document.getElementById('loadRechargesButton').addEventListener('click', function() {
+            const serialNumber = document.getElementById('recharge_serial_number').value;
+            if (!serialNumber) {
+                alert('Please enter a meter serial number');
+                return;
+            }
+
+            axios.get(`/api/recharges?serial_number=${serialNumber}`)
+                .then(response => {
+                    const rechargesList = document.getElementById('rechargesList');
+                    rechargesList.innerHTML = '';
+                    response.data.forEach(recharge => {
+                        rechargesList.innerHTML += `
+                            <tr class="border-t">
+                                <td class="px-6 py-4">${recharge[1]}</td>
+                                <td class="px-6 py-4">${recharge[2]}</td>
+                            </tr>`;
+                    });
+                })
+                .catch(error => {
+                    console.error('Error loading recharge history:', error);
+                });
+        });
+
+        // Initialize and load recharge chart
+        function loadRechargeChart() {
+            axios.get('/api/get_recharges')
+                .then(response => {
+                    const data = response.data;
+                    const ctx = document.getElementById('rechargeChart').getContext('2d');
+                    
+                    // Destroy existing chart if it exists
+                    if (window.rechargeChart) {
+                        window.rechargeChart.destroy();
+                    }
+
+                    window.rechargeChart = new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: data.map(item => item.timestamp),
+                            datasets: [{
+                                label: 'Recharge Amount',
+                                data: data.map(item => item.recharge_amount),
+                                borderColor: 'rgb(75, 192, 192)',
+                                tension: 0.1,
+                                fill: false
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: {
+                                    position: 'top',
+                                }
+                            },
+                            scales: {
+                                y: {
+                                    beginAtZero: true,
+                                    title: {
+                                        display: true,
+                                        text: 'Amount'
+                                    }
+                                },
+                                x: {
+                                    title: {
+                                        display: true,
+                                        text: 'Date'
+                                    },
+                                    ticks: {
+                                        maxRotation: 45,
+                                        minRotation: 45
+                                    }
+                                }
+                            }
+                        }
+                    });
+                })
+                .catch(error => {
+                    console.error('Error loading recharge chart:', error);
+                });
+        }
+
+        // Initial load
+        fetchMeterStatus();
+        loadRechargeChart();
+
+        // Refresh meter status every minute
+        setInterval(fetchMeterStatus, 60000);
+
+        // Add active state to current navigation item
+        function setActiveNavItem() {
+            const hash = window.location.hash || '#dashboard';
+            const activeLink = document.querySelector(`[href="${hash}"]`);
+            if (activeLink) {
+                document.querySelectorAll('.nav-link').forEach(link => {
+                    link.classList.remove('bg-gray-700');
+                });
+                activeLink.classList.add('bg-gray-700');
+            }
+        }
+
+        // Handle browser navigation
+        window.addEventListener('hashchange', setActiveNavItem);
+        setActiveNavItem();
+
+        // Error handling function
+        function handleError(error, elementId) {
+            const element = document.getElementById(elementId);
+            if (element) {
+                element.innerHTML = `
+                    <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
+                        ${error.response?.data?.error || error.message || 'An error occurred'}
+                    </div>
+                `;
+            }
+            console.error('Error:', error);
+        }
+
+        // Success message function
+        function showSuccess(message, elementId) {
+            const element = document.getElementById(elementId);
+            if (element) {
+                element.innerHTML = `
+                    <div class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded">
+                        ${message}
+                    </div>
+                `;
+            }
+        }
+
+        // Format currency function
+        function formatCurrency(amount) {
+            return new Intl.NumberFormat('en-US', {
+                style: 'currency',
+                currency: 'USD'
+            }).format(amount);
+        }
+
+        // Format date function
+        function formatDate(dateString) {
+            return new Date(dateString).toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        }
+
+        // Add loading states to buttons
+        document.querySelectorAll('button').forEach(button => {
+            button.addEventListener('click', function() {
+                if (!this.classList.contains('loading')) {
+                    const originalText = this.innerHTML;
+                    this.innerHTML = '<span class="animate-spin">⌛</span> Loading...';
+                    this.classList.add('loading');
+                    this.disabled = true;
+
+                    // Reset button state after action completes or fails
+                    setTimeout(() => {
+                        this.innerHTML = originalText;
+                        this.classList.remove('loading');
+                        this.disabled = false;
+                    }, 2000);
+                }
+            });
+        });
+
+        // Add form validation
+        function validateForm(formId) {
+            const form = document.getElementById(formId);
+            const inputs = form.querySelectorAll('input[required]');
+            let isValid = true;
+
+            inputs.forEach(input => {
+                if (!input.value.trim()) {
+                    input.classList.add('border-red-500');
+                    isValid = false;
+                } else {
+                    input.classList.remove('border-red-500');
+                }
+            });
+
+            return isValid;
+        }
+
+        // Add input validation to forms
+        ['registerForm', 'rechargeForm'].forEach(formId => {
+            const form = document.getElementById(formId);
+            form.addEventListener('submit', function(event) {
+                if (!validateForm(formId)) {
+                    event.preventDefault();
+                    showError('Please fill in all required fields', `${formId}Result`);
+                }
+            });
+        });
+    </script>
+</body>
+</html>

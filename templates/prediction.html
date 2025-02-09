@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Energy Meter Recharge and Prediction</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+</head>
+
+<body class="bg-gray-100">
+    <div class="container mx-auto p-5">
+        <h1 class="text-3xl font-semibold text-center mb-5">Energy Meter Recharge and Prediction</h1>
+
+        <!-- Serial Number Input -->
+        <div class="flex justify-center">
+            <input type="text" id="serial_number" placeholder="Enter Meter Serial Number"
+                class="p-3 border border-gray-300 rounded-md shadow-md mb-4">
+            <button id="submit_btn" class="bg-blue-500 text-white p-3 rounded-md shadow-md">Submit</button>
+        </div>
+
+        <!-- Display Results -->
+        <div id="error_message" class="text-red-500 text-center hidden">Please enter a valid serial number!</div>
+        <div id="no_data_message" class="text-gray-500 text-center hidden">No data found for this serial number.</div>
+
+        <div id="result" class="mt-5 hidden">
+            <h2 class="text-2xl text-center font-semibold">Recharge Details</h2>
+
+            <!-- Monthly Recharge -->
+            <div class="flex justify-between mt-3">
+                <span class="text-lg">Monthly Recharge:</span>
+                <span id="monthly_recharge" class="font-semibold">-</span>
+            </div>
+
+            <!-- Prediction Result -->
+            <div id="prediction_result" class="mt-5 hidden">
+                <h2 class="text-xl text-center font-semibold">Predicted Payment</h2>
+                <div class="flex justify-between mt-3">
+                    <span class="text-lg">Predicted Payment for Next Month:</span>
+                    <span id="predicted_payment" class="font-semibold">-</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        $(document).ready(function () {
+            // Handle Submit button click
+            $('#submit_btn').click(function () {
+                let serialNumber = $('#serial_number').val().trim();
+
+                // Show error if serial number is empty
+                if (!serialNumber) {
+                    $('#error_message').removeClass('hidden');
+                    $('#result').addClass('hidden');
+                    return;
+                }
+
+                $('#error_message').addClass('hidden');
+
+                // Make API call to login and get recharge data
+                loginAndFetchPrediction(serialNumber);
+            });
+
+            function loginAndFetchPrediction(serialNumber) {
+                $('#result').addClass('hidden');
+                $('#no_data_message').addClass('hidden');
+                $('#prediction_result').addClass('hidden');
+
+                // API Call to login and get recharge data
+                $.ajax({
+                    url: '/login',
+                    type: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify({ "serial_number": serialNumber }),
+                    success: function (data) {
+                        $('#monthly_recharge').text(data.monthly_recharge);
+                        // Call prediction API with monthly recharge
+                        getPrediction(data.monthly_recharge);
+                    },
+                    error: function () {
+                        $('#no_data_message').removeClass('hidden');
+                    }
+                });
+
+                // Show result section after getting the data
+                $('#result').removeClass('hidden');
+            }
+
+            function getPrediction(monthlyRecharge) {
+                const data = {
+                    "previous_month_payment": monthlyRecharge,
+                    "two_months_ago_payment": monthlyRecharge // Adjust if needed
+                };
+
+                // API Call to get the predicted payment
+                $.ajax({
+                    url: '/predictx',
+                    type: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify(data),
+                    success: function (data) {
+                        $('#predicted_payment').text(data.predicted_payment);
+                        $('#prediction_result').removeClass('hidden');
+                    },
+                    error: function () {
+                        alert('Error fetching prediction.');
+                    }
+                });
+            }
+        });
+    </script>
+</body>
+
+</html>

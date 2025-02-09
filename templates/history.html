@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Energy Consumption</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.1.2/dist/tailwind.min.css" rel="stylesheet">
+</head>
+<body class="bg-gray-100">
+    <div class="container mx-auto p-8">
+        <h1 class="text-3xl font-semibold mb-6">Monthly Energy Consumption</h1>
+        <table class="table-auto w-full border-collapse border border-gray-300">
+            <thead>
+                <tr class="bg-gray-200">
+                    <th class="px-4 py-2">Month</th>
+                    <th class="px-4 py-2">Total Consumption (kWh)</th>
+                </tr>
+            </thead>
+            <tbody id="consumption-data">
+                <!-- Data will be injected here via JavaScript -->
+            </tbody>
+        </table>
+    </div>
+
+    <script>
+        fetch('/api/monthly_consumption')
+            .then(response => response.json())
+            .then(data => {
+                const tableBody = document.getElementById('consumption-data');
+                data.forEach(record => {
+                    const row = document.createElement('tr');
+                    row.classList.add('border-b');
+                    row.innerHTML = `
+                        <td class="px-4 py-2">${record[0]}</td>
+                        <td class="px-4 py-2">${record[1]}</td>
+                    `;
+                    tableBody.appendChild(row);
+                });
+            });
+    </script>
+</body>
+</html>
