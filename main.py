@@ -382,38 +382,38 @@ def login():
 #     conn.close()
 #     return recharge_sum
 # Prediction route to predict based on recharge data
-@app.route('/predictx', methods=['POST'])
-def predictx():
-    try:
-        # Get serial number from request data
-        data = request.get_json()
-        serial_number = data.get('serial_number')
+# @app.route('/predictx', methods=['POST'])
+# def predictx():
+#     try:
+#         # Get serial number from request data
+#         data = request.get_json()
+#         serial_number = data.get('serial_number')
 
-        if not serial_number:
-            return jsonify({"error": "Serial number is required."}), 400
+#         if not serial_number:
+#             return jsonify({"error": "Serial number is required."}), 400
 
-        # Get recharge data for the given serial number
-        recharges = get_recharge_data(serial_number)
+#         # Get recharge data for the given serial number
+#         recharges = get_recharge_data(serial_number)
         
-        if not recharges:
-            return jsonify({"error": "No recharge data found for this serial number."}), 404
+#         if not recharges:
+#             return jsonify({"error": "No recharge data found for this serial number."}), 404
 
-        # Process recharge data (e.g., aggregate it for prediction)
-        # Example: sum the recharge amounts for the last month
-        total_recharge = sum([recharge[0] for recharge in recharges])  # Summing recharge amounts
+#         # Process recharge data (e.g., aggregate it for prediction)
+#         # Example: sum the recharge amounts for the last month
+#         total_recharge = sum([recharge[0] for recharge in recharges])  # Summing recharge amounts
         
-        # Use the recharge data to make a prediction
-        sample_customer_data = pd.DataFrame({
-            "Previous Month Payment": [total_recharge],  # Use aggregated data
-            "Two Months Ago Payment": [total_recharge]   # Example: Use same for simplicity, modify as needed
-        })
+#         # Use the recharge data to make a prediction
+#         sample_customer_data = pd.DataFrame({
+#             "Previous Month Payment": [total_recharge],  # Use aggregated data
+#             "Two Months Ago Payment": [total_recharge]   # Example: Use same for simplicity, modify as needed
+#         })
 
-        predicted_payment = loaded_model.predict(sample_customer_data)[0]
+#         predicted_payment = loaded_model.predict(sample_customer_data)[0]
         
-        return jsonify({"predicted_payment": round(predicted_payment, 2)})
+#         return jsonify({"predicted_payment": round(predicted_payment, 2)})
     
-    except Exception as e:
-        return jsonify({"error": str(e)})
+#     except Exception as e:
+#         return jsonify({"error": str(e)})
 
 @app.route('/api/rechargex', methods=['POST'])
 def rechargex():
