@@ -416,16 +416,16 @@ def predictx():
         return jsonify({"error": str(e)})
 
 
-@app.route('/ussd', methods=['POST'])
+app.route('/ussd', methods=['POST'])
 def ussd_callback():
     session_id = request.form.get("sessionId")
     service_code = request.form.get("serviceCode")
     phone_number = request.form.get("phoneNumber")
-    text = request.form.get("text")
+    text = request.form.get("text", "")  # Default to empty string if None
 
-    user_input = text.strip().split("*")
+    user_input = text.strip().split("*") if text else []
 
-    if text == "":
+    if not text:  # If text is empty (first menu)
         response = "CON Welcome to Energy Meter Service\n"
         response += "1. Check Meter Balance\n"
         response += "2. Recharge Meter\n"
@@ -464,33 +464,32 @@ def ussd_callback():
     # Recharge Meter - Step 3 (Process Recharge)
     elif len(user_input) == 3 and user_input[0] == "2":
         serial_number = user_input[1]
-        amount = user_input[2]
+        recharge_amount = user_input[2]
 
         try:
-            amount = float(amount)
+            recharge_amount = float(recharge_amount)
+            if recharge_amount <= 0:
+                return "END Invalid recharge amount."
+
+            conn = sqlite3.connect('energy_meter.db')
+            cursor = conn.cursor()
+
+            # Update balance in the database
+            cursor.execute("UPDATE meter_data SET balance = balance + ? WHERE serial_number = ?", 
+                           (recharge_amount, serial_number))
+            conn.commit()
+            conn.close()
+
+            response = f"END Recharge of {recharge_amount} RWF successful for meter {serial_number}."
         except ValueError:
-            return "END Invalid recharge amount."
+            response = "END Invalid amount. Please enter a number."
 
-        if amount <= 0:
-            return "END Recharge amount must be greater than 0."
-
-        conn = sqlite3.connect('energy_meter.db')
-        cursor = conn.cursor()
-
-        # Update balance
-        cursor.execute("UPDATE meter_data SET balance = balance + ? WHERE serial_number = ?", (amount, serial_number))
-        conn.commit()
-
-        # Insert recharge record
-        cursor.execute("INSERT INTO recharges (serial_number, recharge_amount, timestamp) VALUES (?, ?, datetime('now'))", 
-                       (serial_number, amount))
-        conn.commit()
-        conn.close()
-
-        response = f"END Recharge successful! Your meter has been credited with {amount} RWF."
         return response
 
-    return "END Invalid option. Please try again."
+    # Invalid input
+    else:
+        response = "END Invalid selection. Please try again."
+        return response
 
 
 
