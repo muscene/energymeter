@@ -1,116 +1,80 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Energy Meter Recharge and Prediction</title>
-    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <title>Energy Meter Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
 </head>
-
 <body class="bg-gray-100">
-    <div class="container mx-auto p-5">
-        <h1 class="text-3xl font-semibold text-center mb-5">Energy Meter Recharge and Prediction</h1>
 
-        <!-- Serial Number Input -->
-        <div class="flex justify-center">
-            <input type="text" id="serial_number" placeholder="Enter Meter Serial Number"
-                class="p-3 border border-gray-300 rounded-md shadow-md mb-4">
-            <button id="submit_btn" class="bg-blue-500 text-white p-3 rounded-md shadow-md">Submit</button>
+    <!-- Header -->
+    <header class="bg-blue-600 text-white text-center py-4">
+        <h1 class="text-3xl font-bold">Energy Meter Dashboard</h1>
+    </header>
+
+    <!-- Main Content -->
+    <div class="max-w-6xl mx-auto p-6">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            
+            <!-- Meter Data Card -->
+            <div class="bg-white shadow-lg rounded-lg p-6">
+                <h2 class="text-xl font-semibold mb-4">Meter Information</h2>
+                <p><strong>Serial Number:</strong> <span id="serial-number">Loading...</span></p>
+                <p><strong>Balance:</strong> <span id="balance">Loading...</span></p>
+                <p><strong>Consumption:</strong> <span id="consumption">Loading...</span></p>
+            </div>
+
+            <!-- Recharge History -->
+            <div class="bg-white shadow-lg rounded-lg p-6">
+                <h2 class="text-xl font-semibold mb-4">Recharge History</h2>
+                <ul id="recharge-list" class="list-disc pl-5">
+                    <li>Loading...</li>
+                </ul>
+            </div>
+
         </div>
 
-        <!-- Display Results -->
-        <div id="error_message" class="text-red-500 text-center hidden">Please enter a valid serial number!</div>
-        <div id="no_data_message" class="text-gray-500 text-center hidden">No data found for this serial number.</div>
-
-        <div id="result" class="mt-5 hidden">
-            <h2 class="text-2xl text-center font-semibold">Recharge Details</h2>
-
-            <!-- Monthly Recharge -->
-            <div class="flex justify-between mt-3">
-                <span class="text-lg">Monthly Recharge:</span>
-                <span id="monthly_recharge" class="font-semibold">-</span>
-            </div>
-
-            <!-- Prediction Result -->
-            <div id="prediction_result" class="mt-5 hidden">
-                <h2 class="text-xl text-center font-semibold">Predicted Payment</h2>
-                <div class="flex justify-between mt-3">
-                    <span class="text-lg">Predicted Payment for Next Month:</span>
-                    <span id="predicted_payment" class="font-semibold">-</span>
-                </div>
-            </div>
+        <!-- Payment Prediction Section -->
+        <div class="mt-6 bg-white shadow-lg rounded-lg p-6">
+            <h2 class="text-xl font-semibold mb-4">Payment Prediction</h2>
+            <button id="predict-btn" class="bg-blue-500 text-white px-4 py-2 rounded">Predict Next Payment</button>
+            <p class="mt-3"><strong>Predicted Amount:</strong> <span id="predicted-payment">-</span></p>
         </div>
     </div>
 
     <script>
-        $(document).ready(function () {
-            // Handle Submit button click
-            $('#submit_btn').click(function () {
-                let serialNumber = $('#serial_number').val().trim();
-
-                // Show error if serial number is empty
-                if (!serialNumber) {
-                    $('#error_message').removeClass('hidden');
-                    $('#result').addClass('hidden');
-                    return;
-                }
-
-                $('#error_message').addClass('hidden');
-
-                // Make API call to login and get recharge data
-                loginAndFetchPrediction(serialNumber);
+        // Fetch Meter Data
+        fetch("/api/meter")
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById("serial-number").textContent = data.serial_number;
+                document.getElementById("balance").textContent = data.balance + " KES";
+                document.getElementById("consumption").textContent = data.consumption + " kWh";
             });
 
-            function loginAndFetchPrediction(serialNumber) {
-                $('#result').addClass('hidden');
-                $('#no_data_message').addClass('hidden');
-                $('#prediction_result').addClass('hidden');
-
-                // API Call to login and get recharge data
-                $.ajax({
-                    url: '/login',
-                    type: 'POST',
-                    contentType: 'application/json',
-                    data: JSON.stringify({ "serial_number": serialNumber }),
-                    success: function (data) {
-                        $('#monthly_recharge').text(data.monthly_recharge);
-                        // Call prediction API with monthly recharge
-                        getPrediction(data.monthly_recharge);
-                    },
-                    error: function () {
-                        $('#no_data_message').removeClass('hidden');
-                    }
+        // Fetch Recharge History
+        fetch("/api/recharges")
+            .then(response => response.json())
+            .then(data => {
+                let list = document.getElementById("recharge-list");
+                list.innerHTML = "";
+                data.forEach(item => {
+                    let li = document.createElement("li");
+                    li.textContent = `KES ${item.recharge_amount} on ${item.timestamp}`;
+                    list.appendChild(li);
                 });
+            });
 
-                // Show result section after getting the data
-                $('#result').removeClass('hidden');
-            }
-
-            function getPrediction(monthlyRecharge) {
-                const data = {
-                    "previous_month_payment": monthlyRecharge,
-                    "two_months_ago_payment": monthlyRecharge // Adjust if needed
-                };
-
-                // API Call to get the predicted payment
-                $.ajax({
-                    url: '/predictx',
-                    type: 'POST',
-                    contentType: 'application/json',
-                    data: JSON.stringify(data),
-                    success: function (data) {
-                        $('#predicted_payment').text(data.predicted_payment);
-                        $('#prediction_result').removeClass('hidden');
-                    },
-                    error: function () {
-                        alert('Error fetching prediction.');
-                    }
+        // Predict Payment
+        document.getElementById("predict-btn").addEventListener("click", () => {
+            fetch("/api/predict", { method: "POST" })
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById("predicted-payment").textContent = "KES " + data.predicted_payment;
                 });
-            }
         });
     </script>
-</body>
 
+</body>
 </html>
