@@ -499,7 +499,7 @@ def ussd_callback():
 
 def get_recharge_data(serial_number):
     """ Fetch recharge data from the database for a given serial number """
-    conn = sqlite3.connect(DATABASE)
+    conn = sqlite3.connect('energy_meter.db')
     cursor = conn.cursor()
     cursor.execute("SELECT recharge_amount FROM recharges WHERE serial_number = ?", (serial_number,))
     recharges = cursor.fetchall()
