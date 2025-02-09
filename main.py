@@ -454,7 +454,19 @@ def rechargex():
     else:
         conn.close()
         return jsonify({"error": "Meter not found."}), 404
-
+        
+def execute_query(query, params=(), fetch=False, fetchone=False):
+    conn = sqlite3.connect('energy_meter.db')
+    cursor = conn.cursor()
+    cursor.execute(query, params)
+    result = None
+    if fetch:
+        result = cursor.fetchall()
+    elif fetchone:
+        result = cursor.fetchone()
+    conn.commit()
+    conn.close()
+    return result
 # --- USSD FUNCTIONALITY ---
 @app.route('/ussd', methods=['POST', 'GET'])
 def ussd_callback():
