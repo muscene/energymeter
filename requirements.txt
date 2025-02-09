@@ -1,0 +1,4 @@
+Flask
+pandas
+joblib
+sqlite3  # (This is part of Python's standard library and does not need to be installed separately)
