@@ -468,45 +468,93 @@ def execute_query(query, params=(), fetch=False, fetchone=False):
     conn.close()
     return result
 # --- USSD FUNCTIONALITY ---
-@app.route('/ussd', methods=['POST', 'GET'])
+@app.route('/ussd', methods=['POST'])
 def ussd_callback():
-    session_id = request.values.get("sessionId", None)
-    phone_number = request.values.get("phoneNumber", None)
-    text = request.values.get("text", "")
+    session_id = request.form.get("sessionId")
+    service_code = request.form.get("serviceCode")
+    phone_number = request.form.get("phoneNumber")
+    text = request.form.get("text", "")  # Default to empty string if None
 
-    response = ""
+    user_input = text.strip().split("*") if text else []
 
-    if text == "":
-        response = "CON Welcome to Meter Services\n"
-        response += "1. Check Balance\n"
-        response += "2. View Consumption\n"
-        response += "3. Recharge Meter\n"
+    if not text:  # Main menu
+        response = "CON Welcome to Energy Meter Service\n"
+        response += "1. Check Meter Balance\n"
+        response += "2. Recharge Meter\n"
+        return response
 
+    # Check Meter Balance
     elif text == "1":
-        # Fetch balance using phone number (assuming 1 user per meter)
-        query = "SELECT balance FROM meter_data WHERE owner_contact = ?"
-        meter = execute_query(query, (phone_number,), fetchone=True)
-        balance = meter[0] if meter else "N/A"
-        response = f"END Your current balance is: KES {balance}"
+        response = "CON Enter your meter serial number:"
+        return response
 
+    elif len(user_input) == 2 and user_input[0] == "1":
+        serial_number = user_input[1]
+        conn = sqlite3.connect('energy_meter.db')
+        cursor = conn.cursor()
+        cursor.execute("SELECT balance FROM meter_data WHERE serial_number = ?", (serial_number,))
+        result = cursor.fetchone()
+        conn.close()
+
+        if result:
+            balance = result[0]
+            response = f"END Your meter balance is: {balance} RWF"
+        else:
+            response = "END Meter not found. Please check your serial number."
+        return response
+
+    # Recharge Meter - Step 1: Ask for Serial Number
     elif text == "2":
-        # Fetch consumption data
-        query = "SELECT consumption FROM meter_data WHERE owner_contact = ?"
-        meter = execute_query(query, (phone_number,), fetchone=True)
-        consumption = meter[0] if meter else "N/A"
-        response = f"END Your consumption is: {consumption} kWh"
+        response = "CON Enter your meter serial number:"
+        return response
 
-    elif text == "3":
-        response = "CON Enter recharge amount\n"
+    # Recharge Meter - Step 2: Ask for Amount
+    elif len(user_input) == 2 and user_input[0] == "2":
+        response = "CON Enter the recharge amount:"
+        return response
 
-    elif text.startswith("3*"):
-        recharge_amount = text.split('*')[1]
-        query = "INSERT INTO recharges (serial_number, recharge_amount, timestamp) VALUES (?, ?, ?)"
-        execute_query(query, (phone_number, recharge_amount, datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
-        response = f"END Recharge of {recharge_amount} KES successful!"
+    # Recharge Meter - Step 3: Process Recharge
+    elif len(user_input) == 3 and user_input[0] == "2":
+        serial_number = user_input[1]
+        recharge_amount = user_input[2]
 
-    return response
+        try:
+            recharge_amount = float(recharge_amount)
+            if recharge_amount <= 0:
+                return "END Invalid recharge amount."
 
+            conn = sqlite3.connect('energy_meter.db')
+            cursor = conn.cursor()
+
+            # Check if the meter exists
+            cursor.execute("SELECT balance FROM meter_data WHERE serial_number = ?", (serial_number,))
+            row = cursor.fetchone()
+
+            if row:
+                current_balance = row[0]
+                new_balance = current_balance + recharge_amount
+
+                # Update meter balance
+                cursor.execute("UPDATE meter_data SET balance = ? WHERE serial_number = ?", (new_balance, serial_number))
+
+                # Insert recharge transaction
+                cursor.execute('''
+                    INSERT INTO recharges (serial_number, recharge_amount, timestamp)
+                    VALUES (?, ?, datetime("now"))
+                ''', (serial_number, recharge_amount))
+
+                conn.commit()
+                conn.close()
+
+                return f"END Recharge successful! New balance: {new_balance} RWF"
+            else:
+                conn.close()
+                return "END Meter not found. Please check your serial number."
+
+        except ValueError:
+            return "END Invalid amount. Please enter a valid number."
+
+    return "END Invalid option selected."
 # --- PAYMENT PREDICTION FUNCTIONALITY ---
 
 def get_recharge_data(serial_number):
