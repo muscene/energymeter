@@ -2,7 +2,7 @@ from flask import Flask, render_template, request, jsonify
 import sqlite3
 import pandas as pd
 from flask import Flask, render_template, request, jsonify
-import joblib
+import joblib,sklearn
 import pandas as pd
 
 app = Flask(__name__)
