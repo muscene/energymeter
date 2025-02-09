@@ -6,6 +6,7 @@ import joblib,sklearn,numpy
 import pandas as pd
 
 app = Flask(__name__)
+loaded_model = joblib.load("optimized_customer_payment_model.pkl")  # Ensure this file exists
 
 def init_db():
     # Initialize SQLite database
