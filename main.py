@@ -415,8 +415,8 @@ def predictx():
     except Exception as e:
         return jsonify({"error": str(e)})
 
-@app.route('/api/recharge', methods=['POST'])
-def recharge():
+@app.route('/api/rechargex', methods=['POST'])
+def rechargex():
     data = request.get_json()
     serial_number = data.get('meter_serial_number')
     amount = data.get('recharge_amount', 0)
