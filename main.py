@@ -657,7 +657,7 @@ def ussd_callback():
         # Call predictx to get the predicted payment
         try:
             data = {"serial_number": serial_number}
-            prediction_response = requests.post('/predictx', json=data)
+            prediction_response = requests.post('http://10.223.98.197:5000/predictx', json=data)
             prediction_data = prediction_response.json()
 
             if 'predicted_payment' in prediction_data:
