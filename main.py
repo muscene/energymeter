@@ -566,26 +566,87 @@ def ussd_callback():
 
     user_input = text.strip().split("*") if text else []
 
-    if not text:  # If text is empty (first menu)
+    if not text:  # Main menu
         response = "CON Welcome to Energy Meter Service\n"
-        response += "1. Check Meter Balance\n"
-        response += "2. Recharge Meter\n"
-        response += "3. Predict Next Payment\n"
+        response += "1. Reba umuriro waguze\n"
+        response += "2. Gura umuriro\n"
+        response += "3. Get my feature prediction\n"
         return response
 
     # Option 1: Check Meter Balance
     elif text == "1":
-        response = "CON Enter your meter serial number:"
+        response = "CON Andika Konteri:"
         return response
 
-    # Option 2: Recharge Meter
+    elif len(user_input) == 2 and user_input[0] == "1":
+        serial_number = user_input[1]
+        conn = sqlite3.connect('energy_meter.db')
+        cursor = conn.cursor()
+        cursor.execute("SELECT balance FROM meter_data WHERE serial_number = ?", (serial_number,))
+        result = cursor.fetchone()
+        conn.close()
+
+        if result:
+            balance = result[0]
+            response = f"END Your meter balance is: {balance} RWF"
+        else:
+            response = "END Meter not found. Please check your serial number."
+        return response
+
+    # Option 2: Recharge Meter - Step 1: Ask for Serial Number
     elif text == "2":
-        response = "CON Enter your meter serial number:"
+        response = "CON Andika Konteri:"
         return response
 
-    # Option 3: Predict Next Payment
+    # Recharge Meter - Step 2: Ask for Amount
+    elif len(user_input) == 2 and user_input[0] == "2":
+        response = "CON Enter the recharge amount:"
+        return response
+
+    # Recharge Meter - Step 3: Process Recharge
+    elif len(user_input) == 3 and user_input[0] == "2":
+        serial_number = user_input[1]
+        recharge_amount = user_input[2]
+
+        try:
+            recharge_amount = float(recharge_amount)
+            if recharge_amount <= 0:
+                return "END Invalid recharge amount."
+
+            conn = sqlite3.connect('energy_meter.db')
+            cursor = conn.cursor()
+
+            # Check if the meter exists
+            cursor.execute("SELECT balance FROM meter_data WHERE serial_number = ?", (serial_number,))
+            row = cursor.fetchone()
+
+            if row:
+                current_balance = row[0]
+                new_balance = current_balance + recharge_amount
+
+                # Update meter balance
+                cursor.execute("UPDATE meter_data SET balance = ? WHERE serial_number = ?", (new_balance, serial_number))
+
+                # Insert recharge transaction
+                cursor.execute('''
+                    INSERT INTO recharges (serial_number, recharge_amount, timestamp)
+                    VALUES (?, ?, datetime("now"))
+                ''', (serial_number, recharge_amount))
+
+                conn.commit()
+                conn.close()
+
+                return f"END Recharge successful! New balance: {new_balance} RWF"
+            else:
+                conn.close()
+                return "END Meter not found. Please check your serial number."
+
+        except ValueError:
+            return "END Invalid amount. Please enter a valid number."
+
+    # Option 3: Predict Next Payment (Prediction feature)
     elif text == "3":
-        response = "CON Enter your meter serial number for prediction:"
+        response = "CON Andika Konteri for prediction:"
         return response
 
     # Process serial number input for prediction
@@ -605,13 +666,14 @@ def ussd_callback():
                 response = f"END Error: {prediction_data.get('error', 'Unknown error occurred.')}"
         except requests.exceptions.RequestException as e:
             response = f"END Error: {str(e)}"
-        
+
         return response
 
     # Invalid input
     else:
         response = "END Invalid selection. Please try again."
         return response
+
 
 def get_recharge_data(serial_number):
     """ Fetch recharge data from the database for a given serial number """
