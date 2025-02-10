@@ -4,6 +4,7 @@ import pandas as pd
 from flask import Flask, render_template, request, jsonify
 import joblib,sklearn,numpy
 import pandas as pd
+import requests
 
 app = Flask(__name__)
 loaded_model = joblib.load("optimized_customer_payment_model.pkl")  # Ensure this file exists
