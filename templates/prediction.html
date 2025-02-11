@@ -1,53 +1,220 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Prediction</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Energy Meter Management</title>
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.0.3/dist/tailwind.min.css" rel="stylesheet">
+    <style>
+        nav ul li a.active {
+            @apply bg-blue-500 text-white;
+        }
+    </style>
 </head>
 <body class="bg-blue-900 text-white font-sans">
-    <div class="container mx-auto p-4">
-        <h1 class="text-3xl font-bold mb-4">Payment Prediction</h1>
-        <div class="bg-white p-6 rounded-lg shadow-md text-black">
-            <label for="serial_number" class="block text-lg font-medium mb-2">Serial Number:</label>
-            <input type="text" id="serial_number" class="w-full p-2 border rounded text-black focus:ring-2 focus:ring-blue-500" required>
-            <button id="predictButton" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded mt-4 transition duration-300">Predict</button>
-            <div id="predictionResult" class="mt-4 text-lg"></div>
-            <div id="predictionError" class="mt-4 text-red-500"></div>
+    <div class="flex h-screen">
+        <aside class="w-64 bg-blue-800 p-6 space-y-6">
+            <h1 class="text-xl font-bold">Dashboard</h1>
+            <nav>
+                <ul class="space-y-2">
+                    <li><a href="#home" class="block p-2 hover:bg-blue-700 rounded transition duration-300">Home</a></li>
+                    <li><a href="#meters" class="block p-2 hover:bg-blue-700 rounded transition duration-300">Meters</a></li>
+                    <li><a href="#reports" class="block p-2 hover:bg-blue-700 rounded transition duration-300">Reports</a></li>
+                    <li><a href="#settings" class="block p-2 hover:bg-blue-700 rounded transition duration-300">Settings</a></li>
+                </ul>
+            </nav>
+        </aside>
+
+        <main class="flex-1 p-6 overflow-y-auto">
+    <div class="container mx-auto p-5">
+        <!-- Header Section -->
+        <div class="bg-white rounded-lg shadow-lg p-6 mb-8">
+            <h1 class="text-3xl font-bold text-center text-gray-800">Energy Meter Prediction</h1>
+            <p class="text-center text-gray-600 mt-2">Enter your meter serial number to get usage predictions</p>
+        </div>
+
+        <!-- Main Content -->
+        <div class="bg-white rounded-lg shadow-lg p-6">
+            <!-- Search Section -->
+            <div class="max-w-xl mx-auto">
+                <label for="serial_number" class="block text-sm font-medium text-gray-700 mb-2">
+                    Meter Serial Number
+                </label>
+                <div class="flex gap-3">
+                    <input 
+                        type="text" 
+                        id="serial_number" 
+                        placeholder="Enter your meter serial number"
+                        class="flex-1 p-3 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                    >
+                    <button 
+                        id="predictButton"
+                        class="bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-lg shadow-sm transition-all flex items-center gap-2"
+                    >
+                        <span>Predict</span>
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                        </svg>
+                    </button>
+                </div>
+
+                <!-- Status Messages -->
+                <div id="predictionError" class="hidden mt-3 p-3 bg-red-100 text-red-700 rounded-lg"></div>
+                <div id="loadingMessage" class="hidden mt-3 p-3 bg-blue-100 text-blue-700 rounded-lg">
+                    Processing your request...
+                </div>
+            </div>
+
+            <!-- Results Section -->
+            <div id="predictionResult" class="hidden mt-8">
+                <div class="bg-gray-50 rounded-lg p-6">
+                    <h2 class="text-xl font-semibold text-gray-800 mb-4">Prediction Results</h2>
+                    <div class="space-y-4">
+                        <div class="flex justify-between items-center p-4 bg-white rounded-lg shadow-sm">
+                            <span class="text-gray-600">Predicted Payment</span>
+                            <span id="predictedPaymentValue" class="font-semibold text-green-600 text-xl">-</span>
+                        </div>
+                        <div class="flex justify-between items-center p-4 bg-white rounded-lg shadow-sm">
+                            <span class="text-gray-600">Last Updated</span>
+                            <span id="lastUpdated" class="text-gray-800"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Usage Graph -->
+                <div class="mt-8">
+                    <h2 class="text-xl font-semibold text-gray-800 mb-4">Usage Trend</h2>
+                    <div class="bg-white p-4 rounded-lg shadow-sm">
+                        <canvas id="usageChart" height="200"></canvas>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
     <script>
-        const apiBaseUrl = 'http://172.25.31.124:5000'; // **Correct URL**
+        const apiBaseUrl = 'http://172.25.31.124:5000';
+        let usageChart = null;
+
+        function showError(message) {
+            const errorDiv = document.getElementById('predictionError');
+            errorDiv.textContent = message;
+            errorDiv.classList.remove('hidden');
+        }
+
+        function hideError() {
+            document.getElementById('predictionError').classList.add('hidden');
+        }
+
+        function showLoading(show) {
+            const loadingDiv = document.getElementById('loadingMessage');
+            const predictButton = document.getElementById('predictButton');
+            
+            if (show) {
+                loadingDiv.classList.remove('hidden');
+                predictButton.disabled = true;
+                predictButton.classList.add('opacity-50');
+            } else {
+                loadingDiv.classList.add('hidden');
+                predictButton.disabled = false;
+                predictButton.classList.remove('opacity-50');
+            }
+        }
+
+        function updateChart(predictedValue) {
+            const ctx = document.getElementById('usageChart').getContext('2d');
+            
+            // Generate some mock historical data leading up to the prediction
+            const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'];
+            const historicalData = months.map((month, index) => ({
+                month: month,
+                value: predictedValue * (0.8 + Math.random() * 0.4) // Random variations around predicted value
+            }));
+
+            if (usageChart) {
+                usageChart.destroy();
+            }
+
+            usageChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: [...months, 'Predicted'],
+                    datasets: [{
+                        label: 'Payment Amount',
+                        data: [...historicalData.map(d => d.value), predictedValue],
+                        borderColor: 'rgb(59, 130, 246)',
+                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Amount ($)'
+                            }
+                        }
+                    }
+                }
+            });
+        }
 
         document.getElementById('predictButton').addEventListener('click', () => {
             const serialNumber = document.getElementById('serial_number').value;
-            const predictionResultDiv = document.getElementById('predictionResult');
-            const predictionErrorDiv = document.getElementById('predictionError');
+            
+            if (!serialNumber) {
+                showError('Please enter a serial number');
+                return;
+            }
 
-            predictionResultDiv.textContent = "";
-            predictionErrorDiv.textContent = "";
-
-            console.log("Making request to:", `${apiBaseUrl}/predictx`); // **DEBUG**
-
-            axios.post(`${apiBaseUrl}/predictx`, { serial_number: serialNumber })
-                .then(response => {
-                    console.log("Response:", response.data); // **DEBUG**
-                    const predictedPayment = response.data.predicted_payment;
-                    predictionResultDiv.textContent = `Predicted Payment: ${predictedPayment}`;
-                })
-                .catch(error => {
-                    console.error("Prediction Error:", error); // Keep this for detailed errors
-                    if (error.response) {
-                        console.error("Response Data:", error.response.data); // **DEBUG**
-                        predictionErrorDiv.textContent = `Error: ${error.response.data.error || "An error occurred."}`;
-                    } else if (error.request) {
-                        console.error("Request:", error.request); // **DEBUG**
-                        predictionErrorDiv.textContent = "Error: No response received from the server.";
-                    } else {
-                        predictionErrorDiv.textContent = `Error: ${error.message || "A general error occurred."}`; // **DEBUG**
-                    }
-                });
+            hideError();
+            showLoading(true);
+            
+            console.log("Making request to:", `${apiBaseUrl}/predictx`);
+            
+            axios.post(`${apiBaseUrl}/predictx`, { 
+                serial_number: serialNumber 
+            })
+            .then(response => {
+                console.log("Response:", response.data);
+                const predictedPayment = response.data.predicted_payment;
+                
+                // Update UI with prediction
+                document.getElementById('predictionResult').classList.remove('hidden');
+                document.getElementById('predictedPaymentValue').textContent = 
+                    `$${parseFloat(predictedPayment).toFixed(2)}`;
+                document.getElementById('lastUpdated').textContent = 
+                    new Date().toLocaleString();
+                
+                // Update chart with new data
+                updateChart(predictedPayment);
+            })
+            .catch(error => {
+                console.error("Prediction Error:", error);
+                if (error.response) {
+                    console.error("Response Data:", error.response.data);
+                    showError(`Error: ${error.response.data.error || "An error occurred."}`);
+                } else if (error.request) {
+                    console.error("Request:", error.request);
+                    showError("Error: No response received from the server.");
+                } else {
+                    showError(`Error: ${error.message || "A general error occurred."}`);
+                }
+            })
+            .finally(() => {
+                showLoading(false);
+            });
         });
     </script>
 </body>
