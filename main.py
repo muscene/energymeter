@@ -809,14 +809,14 @@ def consume():
         cursor = conn.cursor()
 
         # Fetch current balance and phone number (assuming stored in DB)
-        cursor.execute('SELECT balance, phone FROM meter_data WHERE serial_number = ?', (serial_number,))
+        cursor.execute('SELECT balance, owner_contact  FROM meter_data WHERE serial_number = ?', (serial_number,))
         row = cursor.fetchone()
 
         if not row:
             conn.close()
             return jsonify({"error": "Meter not found."}), 404
 
-        current_balance, phone = row
+        current_balance, owner_contact  = row
 
         if current_balance <= 0:
             conn.close()
@@ -837,9 +837,9 @@ def consume():
         conn.close()
 
         # **Send SMS if balance is ≤ 1**
-        if new_balance <= 1 and phone:
+        if new_balance <= 1 and owner_contact :
             sms_message = f"Warning! Your energy meter balance is low: {new_balance} kWh. Please recharge soon."
-            sms_status = send_sms(phone, sms_message)
+            sms_status = send_sms(owner_contact , sms_message)
 
             if sms_status:
                 return jsonify({"message": "Recharge successful!", "new_balance": new_balance, "sms": "Sent"}), 200
