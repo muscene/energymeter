@@ -75,6 +75,7 @@ def recharge():
     serial_number = data.get('meter_serial_number')
     amount = data.get('recharge_amount', 0)
     
+    
 
     try:
         amount = float(amount)
@@ -619,9 +620,11 @@ def ussd_callback():
     elif len(user_input) == 3 and user_input[0] == "2":
         serial_number = user_input[1]
         recharge_amount = user_input[2]
-
+        
         try:
             recharge_amount = float(recharge_amount)
+            recharge_amount = float(recharge_amount)
+            recharge_amount =(recharge_amount*0.0047)
             if recharge_amount <= 0:
                 return "END Invalid recharge amount."
 
