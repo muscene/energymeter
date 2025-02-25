@@ -7,6 +7,7 @@ import pandas as pd
 import requests
 import requests
 import urllib.parse
+import time
 app = Flask(__name__)
 loaded_model = joblib.load("optimized_customer_payment_model.pkl")  # Ensure this file exists
 
