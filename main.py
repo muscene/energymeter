@@ -856,7 +856,7 @@ def consume():
                 }
                 
                 try:
-                    response = requests.get(url, params=params, headers=headers, verify=False)
+                    response = requests.get(url, params=params, headers=headers, verify=True)
                     sms_result = "Sent" if response.status_code == 200 else "Failed"
                 except requests.exceptions.RequestException as e:
                     print(f"SMS Sending Error: {e}")
