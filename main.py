@@ -733,6 +733,7 @@ def predictx():
     
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+        
 @app.route('/api/consume', methods=['POST'])
 def consume():
     try:
@@ -785,12 +786,12 @@ def consume():
         # Log the consumption transaction
         cursor.execute(
             'INSERT INTO recharges (serial_number, recharge_amount, timestamp) VALUES (?, ?, datetime("now"))',
-            (serial_number, amount)
+            (serial_number, -amount)  # Store as negative to indicate consumption
         )
         
         conn.commit()
         
-        # Always send SMS notification about the consumption and current balance
+        # Send SMS notification about the consumption and current balance
         sms_status = "Failed"
         if phone:
             # Standard consumption message
@@ -800,27 +801,12 @@ def consume():
             if new_balance <= 1:
                 sms_message += " WARNING: Your balance is critically low. Please recharge soon!"
             
-            # Use direct requests call to ensure SMS delivery
-            try:
-                url = "https://vrt.rw/SMS/sms.php"
-                params = {
-                    "phone": phone,
-                    "message": sms_message
-                }
-                headers = {
-                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
-                }
-                
-                response = requests.get(url, params=params, headers=headers, timeout=10)
-                
-                if response.status_code == 200:
-                    sms_status = "Sent"
-                    print(f"SMS sent successfully to {phone}")
-                else:
-                    print(f"SMS sending failed with status code: {response.status_code}")
-                    
-            except requests.exceptions.RequestException as e:
-                print(f"SMS Sending Error: {e}")
+            # Use the improved SMS function with retry mechanism
+            if send_sms(phone, sms_message, max_retries=3):
+                sms_status = "Sent"
+                print(f"SMS sent successfully to {phone}")
+            else:
+                print(f"Failed to send SMS to {phone} after multiple attempts")
         else:
             sms_status = "No phone number available"
         
@@ -832,7 +818,6 @@ def consume():
             "new_balance": new_balance,
             "sms_status": sms_status
         }
-        
         return jsonify(response_data), 200
         
     except sqlite3.Error as e:
@@ -840,19 +825,23 @@ def consume():
     except Exception as e:
         return jsonify({"error": "Internal server error", "details": str(e)}), 500
 
-# Improved SMS sending function with retry mechanism
 def send_sms(phone, message, max_retries=3):
     """Send an SMS with retry mechanism"""
     SMS_API_URL = "https://vrt.rw/SMS/sms.php"
     
     for attempt in range(max_retries):
         try:
-            url = f"{SMS_API_URL}?phone={phone}&message={message}"
+            # Use params for proper URL encoding
+            params = {
+                "phone": phone,
+                "message": message
+            }
+            
             headers = {
                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
             }
             
-            response = requests.get(url, headers=headers, timeout=10)
+            response = requests.get(SMS_API_URL, params=params, headers=headers, timeout=10)
             
             if response.status_code == 200:
                 print(f"SMS sent successfully on attempt {attempt+1}")
@@ -865,49 +854,8 @@ def send_sms(phone, message, max_retries=3):
             print(f"Attempt {attempt+1}: SMS Sending Error: {e}")
             time.sleep(1)  # Wait before retrying
             
-    return False  # All retries failed# @app.route('/api/consume', methods=['POST'])
-# def consume():
-#     data = request.get_json()
-#     serial_number = data.get('meter_serial_number')
-#     amount = data.get('recharge_amount', 0)
-
-#     try:
-#         amount = float(amount)
-#     except ValueError:
-#         return jsonify({"error": "Invalid recharge amount."}), 400
-
-#     if not serial_number or amount <=-1:
-#         return jsonify({"error": "Invalid serial number or amount."}), 400
-
-#     conn = sqlite3.connect('energy_meter.db')
-#     cursor = conn.cursor()
-
-#     cursor.execute('SELECT balance FROM meter_data WHERE serial_number = ?', (serial_number,))
-#     row = cursor.fetchone()
-
-#     if row:
-#         current_balance = row[0]
-#         if current_balance <= 0:
-#             new_balance = current_balance
-#         else:
-#             new_balance = current_balance - amount 
-#         # new_balance = current_balance - amount
-        
-#         cursor.execute('UPDATE meter_data SET balance = ? WHERE serial_number = ?', (new_balance, serial_number))
-
-#         # Insert recharge record with timestamp
-#         cursor.execute('''
-#             INSERT INTO recharges (serial_number, recharge_amount, timestamp)
-#             VALUES (?, ?, datetime("now"))
-#         ''', (serial_number, amount))
-
-#         conn.commit()
-#         conn.close()
-
-#         return jsonify({"message": "Recharge successful!", "new_balance": new_balance}), 200
-#     else:
-#         conn.close()
-#         return jsonify({"error": "Meter not found."}), 404
+    return False  # All retries failed
+    
 # SMS_API_URL = "https://vrt.rw/SMS/sms.php"
 
 # def send_sms(phone, message):
