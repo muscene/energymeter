@@ -574,49 +574,49 @@ def execute_query(query, params=(), fetch=False, fetchone=False):
 
 
 
-@app.route('/api/consume', methods=['POST'])
-def consume():
-    data = request.get_json()
-    serial_number = data.get('meter_serial_number')
-    amount = data.get('recharge_amount', 0)
+# @app.route('/api/consume', methods=['POST'])
+# def consume():
+#     data = request.get_json()
+#     serial_number = data.get('meter_serial_number')
+#     amount = data.get('recharge_amount', 0)
 
-    try:
-        amount = float(amount)
-    except ValueError:
-        return jsonify({"error": "Invalid recharge amount."}), 400
+#     try:
+#         amount = float(amount)
+#     except ValueError:
+#         return jsonify({"error": "Invalid recharge amount."}), 400
 
-    if not serial_number or amount <=-1:
-        return jsonify({"error": "Invalid serial number or amount."}), 400
+#     if not serial_number or amount <=-1:
+#         return jsonify({"error": "Invalid serial number or amount."}), 400
 
-    conn = sqlite3.connect('energy_meter.db')
-    cursor = conn.cursor()
+#     conn = sqlite3.connect('energy_meter.db')
+#     cursor = conn.cursor()
 
-    cursor.execute('SELECT balance FROM meter_data WHERE serial_number = ?', (serial_number,))
-    row = cursor.fetchone()
+#     cursor.execute('SELECT balance FROM meter_data WHERE serial_number = ?', (serial_number,))
+#     row = cursor.fetchone()
 
-    if row:
-        current_balance = row[0]
-        if current_balance <= 0:
-            new_balance = current_balance
-        else:
-            new_balance = current_balance - amount 
-        # new_balance = current_balance - amount
+#     if row:
+#         current_balance = row[0]
+#         if current_balance <= 0:
+#             new_balance = current_balance
+#         else:
+#             new_balance = current_balance - amount 
+#         # new_balance = current_balance - amount
         
-        cursor.execute('UPDATE meter_data SET balance = ? WHERE serial_number = ?', (new_balance, serial_number))
+#         cursor.execute('UPDATE meter_data SET balance = ? WHERE serial_number = ?', (new_balance, serial_number))
 
-        # Insert recharge record with timestamp
-        cursor.execute('''
-            INSERT INTO recharges (serial_number, recharge_amount, timestamp)
-            VALUES (?, ?, datetime("now"))
-        ''', (serial_number, amount))
+#         # Insert recharge record with timestamp
+#         cursor.execute('''
+#             INSERT INTO recharges (serial_number, recharge_amount, timestamp)
+#             VALUES (?, ?, datetime("now"))
+#         ''', (serial_number, amount))
 
-        conn.commit()
-        conn.close()
+#         conn.commit()
+#         conn.close()
 
-        return jsonify({"message": "Recharge successful!", "new_balance": new_balance}), 200
-    else:
-        conn.close()
-        return jsonify({"error": "Meter not found."}), 404
+#         return jsonify({"message": "Recharge successful!", "new_balance": new_balance}), 200
+#     else:
+#         conn.close()
+#         return jsonify({"error": "Meter not found."}), 404
 
 @app.route('/ussd', methods=['POST'])
 def ussd_callback():
