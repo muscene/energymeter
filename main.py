@@ -733,144 +733,22 @@ def predictx():
     
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-        
-@app.route('/api/consume', methods=['POST'])
-def consume():
-    try:
-        data = request.get_json()
-        serial_number = data.get('meter_serial_number', '').strip()
-        amount = data.get('recharge_amount', 0)
-        
-        # Validate input
-        if not serial_number:
-            return jsonify({"error": "Invalid serial number."}), 400
-        
-        try:
-            amount = float(amount)
-            if amount < 0:
-                return jsonify({"error": "Consumption amount must be non-negative."}), 400
-        except ValueError:
-            return jsonify({"error": "Invalid consumption amount."}), 400
-            
-        # Connect to database
-        conn = sqlite3.connect('energy_meter.db')
-        cursor = conn.cursor()
-        
-        # Fetch balance and contact information
-        cursor.execute(
-            'SELECT balance, owner_contact FROM meter_data WHERE serial_number = ?', 
-            (serial_number,)
-        )
-        row = cursor.fetchone()
-        
-        if not row:
-            conn.close()
-            return jsonify({"error": "Meter not found."}), 404
-            
-        current_balance, phone = row
-        
-        # Check if there's enough balance
-        if current_balance <= 0:
-            conn.close()
-            return jsonify({"error": "Insufficient balance."}), 400
-            
-        # Calculate new balance (prevent negative balance)
-        new_balance = max(0, current_balance - amount)
-        
-        # Update balance in database
-        cursor.execute(
-            'UPDATE meter_data SET balance = ? WHERE serial_number = ?',
-            (new_balance, serial_number)
-        )
-        
-        # Log the consumption transaction
-        cursor.execute(
-            'INSERT INTO recharges (serial_number, recharge_amount, timestamp) VALUES (?, ?, datetime("now"))',
-            (serial_number, -amount)  # Store as negative to indicate consumption
-        )
-        
-        conn.commit()
-        
-        # Send SMS notification about the consumption and current balance
-        sms_status = "Failed"
-        if phone:
-            # Standard consumption message
-            sms_message = f"Your meter {serial_number} has consumed {amount} kWh. New balance: {new_balance} kWh."
-            
-            # Add warning if balance is low
-            if new_balance <= 1:
-                sms_message += " WARNING: Your balance is critically low. Please recharge soon!"
-            
-            # Use the improved SMS function with retry mechanism
-            if send_sms(phone, sms_message, max_retries=3):
-                sms_status = "Sent"
-                print(f"SMS sent successfully to {phone}")
-            else:
-                print(f"Failed to send SMS to {phone} after multiple attempts")
-        else:
-            sms_status = "No phone number available"
-        
-        conn.close()
-                
-        # Return success response with balance and notification status
-        response_data = {
-            "message": "Consumption recorded successfully!",
-            "new_balance": new_balance,
-            "sms_status": sms_status
-        }
-        return jsonify(response_data), 200
-        
-    except sqlite3.Error as e:
-        return jsonify({"error": "Database error", "details": str(e)}), 500
-    except Exception as e:
-        return jsonify({"error": "Internal server error", "details": str(e)}), 500
-
-def send_sms(phone, message, max_retries=3):
-    """Send an SMS with retry mechanism"""
-    SMS_API_URL = "https://vrt.rw/SMS/sms.php"
-    
-    for attempt in range(max_retries):
-        try:
-            # Use params for proper URL encoding
-            params = {
-                "phone": phone,
-                "message": message
-            }
-            
-            headers = {
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
-            }
-            
-            response = requests.get(SMS_API_URL, params=params, headers=headers, timeout=10)
-            
-            if response.status_code == 200:
-                print(f"SMS sent successfully on attempt {attempt+1}")
-                return True
-            else:
-                print(f"Attempt {attempt+1}: SMS failed with status code {response.status_code}")
-                time.sleep(1)  # Wait before retrying
-                
-        except Exception as e:
-            print(f"Attempt {attempt+1}: SMS Sending Error: {e}")
-            time.sleep(1)  # Wait before retrying
-            
-    return False  # All retries failed
     
 # SMS_API_URL = "https://vrt.rw/SMS/sms.php"
 
-# def send_sms(phone, message):
-#     """Send an SMS alert when balance is low"""
-#     try:
-#         url = f"{SMS_API_URL}?phone={phone}&message={message}"
-#         response = requests.get(url)
+def send_sms(phone, message):
+    """Send an SMS alert when balance is low"""
+    try:
+        url = f"{SMS_API_URL}?phone={phone}&message={message}"
+        response = requests.get(url)
 
-#         if response.status_code == 200:
-#             return True  # SMS sent successfully
-#         else:
-#             return False  # SMS failed
-#     except Exception as e:
-#         print(f"SMS Sending Error: {e}")
-#         return False
+        if response.status_code == 200:
+            return True  # SMS sent successfully
+        else:
+            return False  # SMS failed
+    except Exception as e:
+        print(f"SMS Sending Error: {e}")
+        return False
 
 # @app.route('/api/consume', methods=['POST'])
 # def consume():
@@ -906,10 +784,19 @@ def send_sms(phone, message, max_retries=3):
 #             return jsonify({"error": "Insufficient balance."}), 400
 
 #         new_balance = max(0, current_balance - amount)  # Ensure balance never goes negative
+#         if new_balance <= 1 and owner_contact :
+#             sms_message = f"Warning! Your energy meter balance is low: {new_balance} kWh. Please recharge soon."
+#             sms_status = send_sms(owner_contact , sms_message)
+#         #     if sms_status:
+#         #         return jsonify({"message": "Recharge successful!", "new_balance": new_balance, "sms": "Sent"}), 200
+#         #     else:
+#         #         return jsonify({"message": "Recharge successful!", "new_balance": new_balance, "sms": "Failed"}), 200
+
+#         # return jsonify({"message": "Recharge successful!", "new_balance": new_balance}), 200
+
 
 #         # Update balance
 #         cursor.execute('UPDATE meter_data SET balance = ? WHERE serial_number = ?', (new_balance, serial_number))
-
 #         # Log recharge
 #         cursor.execute('''
 #             INSERT INTO recharges (serial_number, recharge_amount, timestamp)
@@ -920,17 +807,7 @@ def send_sms(phone, message, max_retries=3):
 #         conn.close()
 
 #         # **Send SMS if balance is ≤ 1**
-#         if new_balance <= 1 and owner_contact :
-#             sms_message = f"Warning! Your energy meter balance is low: {new_balance} kWh. Please recharge soon."
-#             sms_status = send_sms(owner_contact , sms_message)
-
-#             if sms_status:
-#                 return jsonify({"message": "Recharge successful!", "new_balance": new_balance, "sms": "Sent"}), 200
-#             else:
-#                 return jsonify({"message": "Recharge successful!", "new_balance": new_balance, "sms": "Failed"}), 200
-
-#         return jsonify({"message": "Recharge successful!", "new_balance": new_balance}), 200
-
+        
 #     except sqlite3.Error as e:
 #         return jsonify({"error": "Database error", "details": str(e)}), 500
 
@@ -938,90 +815,90 @@ def send_sms(phone, message, max_retries=3):
 #         return jsonify({"error": "Internal server error", "details": str(e)}), 500
 
 
-# @app.route('/api/consume', methods=['POST'])
-# def consume():
-#     try:
-#         data = request.get_json()
-#         serial_number = data.get('meter_serial_number', '').strip()
-#         amount = data.get('recharge_amount', 0)
+@app.route('/api/consume', methods=['POST'])
+def consume():
+    try:
+        data = request.get_json()
+        serial_number = data.get('meter_serial_number', '').strip()
+        amount = data.get('recharge_amount', 0)
         
-#         # Validate input
-#         if not serial_number or not serial_number.isalnum():
-#             return jsonify({"error": "Invalid serial number."}), 400
-#         try:
-#             amount = float(amount)
-#             if amount < 0:
-#                 return jsonify({"error": "Recharge amount must be non-negative."}), 400
-#         except ValueError:
-#             return jsonify({"error": "Invalid recharge amount."}), 400
+        # Validate input
+        if not serial_number or not serial_number.isalnum():
+            return jsonify({"error": "Invalid serial number."}), 400
+        try:
+            amount = float(amount)
+            if amount < 0:
+                return jsonify({"error": "Recharge amount must be non-negative."}), 400
+        except ValueError:
+            return jsonify({"error": "Invalid recharge amount."}), 400
             
-#         # Connect to database using context manager
-#         with sqlite3.connect('energy_meter.db') as conn:
-#             cursor = conn.cursor()
+        # Connect to database using context manager
+        with sqlite3.connect('energy_meter.db') as conn:
+            cursor = conn.cursor()
             
-#             # Fetch balance and phone number securely
-#             cursor.execute(
-#                 'SELECT balance, owner_contact FROM meter_data WHERE serial_number = ?', 
-#                 (serial_number,)
-#             )
-#             row = cursor.fetchone()
-#             if not row:
-#                 return jsonify({"error": "Meter not found."}), 404
+            # Fetch balance and phone number securely
+            cursor.execute(
+                'SELECT balance, owner_contact FROM meter_data WHERE serial_number = ?', 
+                (serial_number,)
+            )
+            row = cursor.fetchone()
+            if not row:
+                return jsonify({"error": "Meter not found."}), 404
                 
-#             current_balance, phone = row
-#             if current_balance <= 0:
-#                 return jsonify({"error": "Insufficient balance."}), 400
+            current_balance, phone = row
+            if current_balance <= 0:
+                return jsonify({"error": "Insufficient balance."}), 400
                 
-#             new_balance = max(0, current_balance - amount)  # Prevent negative balance
+            new_balance = max(0, current_balance - amount)  # Prevent negative balance
             
-#             # Update balance in database
-#             cursor.execute(
-#                 'UPDATE meter_data SET balance = ? WHERE serial_number = ?',
-#                 (new_balance, serial_number)
-#             )
+            # Update balance in database
+            cursor.execute(
+                'UPDATE meter_data SET balance = ? WHERE serial_number = ?',
+                (new_balance, serial_number)
+            )
             
-#             # Log the transaction
-#             cursor.execute(
-#                 'INSERT INTO recharges (serial_number, recharge_amount, timestamp) VALUES (?, ?, datetime("now"))',
-#                 (serial_number, amount)
-#             )
-#             conn.commit()
+            # Log the transaction
+            cursor.execute(
+                'INSERT INTO recharges (serial_number, recharge_amount, timestamp) VALUES (?, ?, datetime("now"))',
+                (serial_number, amount)
+            )
+            conn.commit()
             
-#         sms_result = "Not sent"
+        sms_result = "Not sent"
         
-#         # Send SMS to owner_contact using the improved method
-#         if phone:
-#             sms_message = f"Dear Customer, your energy meter {serial_number} has been recharged with {amount} kWh. New balance: {new_balance} kWh."
+        # Send SMS to owner_contact using the improved method
+        if phone:
+            sms_message = f"Dear Customer, your energy meter {serial_number} has been recharged with {amount} kWh. New balance: {new_balance} kWh."
             
-#             # Use the new SMS sending method
-#             url = "https://vrt.rw/SMS/sms.php"
-#             params = {
-#                 "phone": phone,
-#                 "message": sms_message
-#             }
-#             headers = {
-#                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
-#             }
+            # Use the new SMS sending method
+            url = "https://vrt.rw/SMS/sms.php"
+            params = {
+                "phone": phone,
+                "message": sms_message
+            }
+            headers = {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
+            }
             
-#             try:
-#                 response = requests.get(url, params=params, headers=headers, verify=False)
-#                 sms_result = "Sent" if response.status_code == 200 else "Failed"
-#             except requests.exceptions.RequestException as e:
-#                 print(f"SMS Sending Error: {e}")
-#                 sms_result = "Failed"
+            try:
+                response = requests.get(url, params=params, headers=headers, verify=False)
+                sms_result = "Sent" if response.status_code == 200 else "Failed"
+            except requests.exceptions.RequestException as e:
+                print(f"SMS Sending Error: {e}")
+                sms_result = "Failed"
                 
-#         # Response with owner_contact and SMS status
-#         response_data = {
-#             "message": "Recharge successful!",
-#             "new_balance": new_balance,
-#                   }
+        # Response with owner_contact and SMS status
+        response_data = {
+            "message": "Recharge successful!",
+            "new_balance": new_balance,
+                  }
         
-#         return jsonify(response_data), 200
+        return jsonify(response_data), 200
         
-#     except sqlite3.Error as e:
-#         return jsonify({"error": "Database error", "details": str(e)}), 500
-#     except Exception as e:
-#         return jsonify({"error": "Internal server error", "details": str(e)}), 500
+    except sqlite3.Error as e:
+        return jsonify({"error": "Database error", "details": str(e)}), 500
+    except Exception as e:
+        return jsonify({"error": "Internal server error", "details": str(e)}), 500
 
 
 @app.route('/api/delete/<serial_number>', methods=['DELETE'])
