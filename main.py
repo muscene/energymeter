@@ -790,12 +790,39 @@ def consume():
         
         conn.commit()
         
-        # Send SMS notification if balance is low (≤ 1)
-        sms_status = "Not required"
-        if new_balance <= 1 and phone:
-            sms_message = f"Warning! Your energy meter (SN: {serial_number}) balance is low: {new_balance} kWh. Please recharge soon."
-            sms_status = send_sms(phone, sms_message)
-            sms_status = "Sent" if sms_status else "Failed"
+        # Always send SMS notification about the consumption and current balance
+        sms_status = "Failed"
+        if phone:
+            # Standard consumption message
+            sms_message = f"Your meter {serial_number} has consumed {amount} kWh. New balance: {new_balance} kWh."
+            
+            # Add warning if balance is low
+            if new_balance <= 1:
+                sms_message += " WARNING: Your balance is critically low. Please recharge soon!"
+            
+            # Use direct requests call to ensure SMS delivery
+            try:
+                url = "https://vrt.rw/SMS/sms.php"
+                params = {
+                    "phone": phone,
+                    "message": sms_message
+                }
+                headers = {
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
+                }
+                
+                response = requests.get(url, params=params, headers=headers, timeout=10)
+                
+                if response.status_code == 200:
+                    sms_status = "Sent"
+                    print(f"SMS sent successfully to {phone}")
+                else:
+                    print(f"SMS sending failed with status code: {response.status_code}")
+                    
+            except requests.exceptions.RequestException as e:
+                print(f"SMS Sending Error: {e}")
+        else:
+            sms_status = "No phone number available"
         
         conn.close()
                 
@@ -803,7 +830,7 @@ def consume():
         response_data = {
             "message": "Consumption recorded successfully!",
             "new_balance": new_balance,
-            "notification": sms_status
+            "sms_status": sms_status
         }
         
         return jsonify(response_data), 200
@@ -812,7 +839,33 @@ def consume():
         return jsonify({"error": "Database error", "details": str(e)}), 500
     except Exception as e:
         return jsonify({"error": "Internal server error", "details": str(e)}), 500
-# @app.route('/api/consume', methods=['POST'])
+
+# Improved SMS sending function with retry mechanism
+def send_sms(phone, message, max_retries=3):
+    """Send an SMS with retry mechanism"""
+    SMS_API_URL = "https://vrt.rw/SMS/sms.php"
+    
+    for attempt in range(max_retries):
+        try:
+            url = f"{SMS_API_URL}?phone={phone}&message={message}"
+            headers = {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
+            }
+            
+            response = requests.get(url, headers=headers, timeout=10)
+            
+            if response.status_code == 200:
+                print(f"SMS sent successfully on attempt {attempt+1}")
+                return True
+            else:
+                print(f"Attempt {attempt+1}: SMS failed with status code {response.status_code}")
+                time.sleep(1)  # Wait before retrying
+                
+        except Exception as e:
+            print(f"Attempt {attempt+1}: SMS Sending Error: {e}")
+            time.sleep(1)  # Wait before retrying
+            
+    return False  # All retries failed# @app.route('/api/consume', methods=['POST'])
 # def consume():
 #     data = request.get_json()
 #     serial_number = data.get('meter_serial_number')
@@ -855,21 +908,21 @@ def consume():
 #     else:
 #         conn.close()
 #         return jsonify({"error": "Meter not found."}), 404
-SMS_API_URL = "https://vrt.rw/SMS/sms.php"
+# SMS_API_URL = "https://vrt.rw/SMS/sms.php"
 
-def send_sms(phone, message):
-    """Send an SMS alert when balance is low"""
-    try:
-        url = f"{SMS_API_URL}?phone={phone}&message={message}"
-        response = requests.get(url)
+# def send_sms(phone, message):
+#     """Send an SMS alert when balance is low"""
+#     try:
+#         url = f"{SMS_API_URL}?phone={phone}&message={message}"
+#         response = requests.get(url)
 
-        if response.status_code == 200:
-            return True  # SMS sent successfully
-        else:
-            return False  # SMS failed
-    except Exception as e:
-        print(f"SMS Sending Error: {e}")
-        return False
+#         if response.status_code == 200:
+#             return True  # SMS sent successfully
+#         else:
+#             return False  # SMS failed
+#     except Exception as e:
+#         print(f"SMS Sending Error: {e}")
+#         return False
 
 # @app.route('/api/consume', methods=['POST'])
 # def consume():
