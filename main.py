@@ -780,19 +780,19 @@ def predictx():
 #         return jsonify({"error": "Meter not found."}), 404
 SMS_API_URL = "https://vrt.rw/SMS/sms.php"
 
-def send_sms(phone, message):
-    """Send an SMS alert when balance is low"""
-    try:
-        url = f"{SMS_API_URL}?phone={phone}&message={message}"
-        response = requests.get(url)
+# def send_sms(phone, message):
+#     """Send an SMS alert when balance is low"""
+#     try:
+#         url = f"{SMS_API_URL}?phone={phone}&message={message}"
+#         response = requests.get(url)
 
-        if response.status_code == 200:
-            return True  # SMS sent successfully
-        else:
-            return False  # SMS failed
-    except Exception as e:
-        print(f"SMS Sending Error: {e}")
-        return False
+#         if response.status_code == 200:
+#             return True  # SMS sent successfully
+#         else:
+#             return False  # SMS failed
+#     except Exception as e:
+#         print(f"SMS Sending Error: {e}")
+#         return False
 
 @app.route('/api/consume', methods=['POST'])
 def consume():
