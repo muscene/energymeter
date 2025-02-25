@@ -935,15 +935,16 @@ def consume():
         response_data = {
             "message": "Recharge successful!",
             "new_balance": new_balance,
-            "owner_contact": phone,
-            "sms": sms_result
-        }
+                  }
+        
         return jsonify(response_data), 200
         
     except sqlite3.Error as e:
         return jsonify({"error": "Database error", "details": str(e)}), 500
     except Exception as e:
         return jsonify({"error": "Internal server error", "details": str(e)}), 500
+
+
 @app.route('/api/delete/<serial_number>', methods=['DELETE'])
 def delete_meter(serial_number):
     conn = sqlite3.connect('energy_meter.db')
