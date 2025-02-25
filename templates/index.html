@@ -163,41 +163,91 @@ document.getElementById('registerForm').addEventListener('submit', function(even
         });
 
         // Load Registered Meters
-        document.getElementById('loadMetersButton').addEventListener('click', loadRegisteredMeters);
-
-        function loadRegisteredMeters() {
-    axios.get(`${apiBaseUrl}/registered_meters`)
-        .then(response => {
-            const metersList = document.getElementById('metersList');
-            metersList.innerHTML = ''; // Clear existing list
-
-            if (response.data && Array.isArray(response.data)) {
-                if (response.data.length === 0) {
-                    metersList.innerHTML = "<li>No registered meters found.</li>";
-                } else {
-                    response.data.forEach(meter => {
-                        // Access elements by index since it's an array of arrays
-                        const serialNumber = meter[0] || "N/A";
-                        const ownerName = meter[1] || "N/A";
-                        const ownerContact = meter[2] || "N/A";
-                        const balance = meter[3] || "N/A";
-                        // const timestamp = meter[4] || "N/A"; // If you want to display the timestamp as well
-
-                        metersList.innerHTML += `<li>Serial Number: ${serialNumber}, Owner: ${ownerName}, Contact: ${ownerContact}, Balance: ${balance}</li>`;
-                    });
-                }
-            } else {
-                console.error("Invalid data format for registered meters:", response.data);
-                metersList.innerHTML = "<li>Error loading registered meters.</li>"; // Indicate an error
-            }
-        })
-        .catch(error => {
-            console.error("Error loading registered meters:", error);
-            alert("Failed to load meters.");
+document.getElementById('loadMetersButton').addEventListener('click', loadRegisteredMeters);
+async function deleteMeter(serialNumber) {
+    try {
+        const response = await fetch(`${apiBaseUrl}/delete/${serialNumber}`, {
+            method: 'DELETE',
         });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+        }
+
+        const data = await response.json();
+        console.log(data.message); // "Meter deleted successfully!"
+        loadRegisteredMeters(); // Refresh the meter list after deletion
+        alert(data.message); // Alert the user of successful deletion
+
+    } catch (error) {
+        console.error("Error deleting meter:", error);
+        alert(error.message);
+    }
+}
+async function loadRegisteredMeters() {  // Use async/await
+  try {
+    const response = await axios.get(`${apiBaseUrl}/registered_meters`);
+
+    const metersList = document.getElementById('metersList');
+    metersList.innerHTML = ''; // Clear existing list
+
+    if (!response.data || !Array.isArray(response.data)) { // Check for valid data
+      console.error("Invalid data format for registered meters:", response.data);
+      metersList.innerHTML = "<li>Error loading registered meters.</li>";
+      return; // Stop here if data is invalid
+    }
+
+    if (response.data.length === 0) {
+      metersList.innerHTML = "<li>No registered meters found.</li>";
+      return; // Stop here if no meters
+    }
+
+
+    response.data.forEach(meter => {
+        const serialNumber = meter[0] || "N/A";
+    const ownerName = meter[1] || "N/A";
+    const ownerContact = meter[2] || "N/A";
+
+    // Convert balance to a number before comparing
+    let balance = Number(meter[3]) || 0; // Default to 0 if conversion fails
+
+    if (balance < 0) {
+        balance = 0;
+    }
+    const listItem = document.createElement('li');
+    listItem.classList.add('bg-blue-700', 'p-4', 'rounded-lg', 'shadow-md', 'mb-2', 'flex', 'items-center');
+
+    const meterInfo = document.createElement('div');
+    meterInfo.innerHTML = `
+        <span class="font-semibold">Serial Number:</span> ${serialNumber}<br>
+        <span class="font-semibold">Owner:</span> ${ownerName}<br>
+        <span class="font-semibold">Contact:</span> ${ownerContact}<br>
+        <span class="font-semibold">Balance:</span> ${balance}
+    `;
+    meterInfo.classList.add('flex-grow');
+    listItem.appendChild(meterInfo);
+
+    const deleteButton = document.createElement('button');
+    deleteButton.textContent = 'Delete';
+    deleteButton.classList.add('bg-red-500', 'text-white', 'py-1', 'px-2', 'rounded', 'hover:bg-red-700', 'ml-2');
+    deleteButton.addEventListener('click', () => {
+        deleteMeter(serialNumber); // serialNumber is now correctly defined
+    });
+    listItem.appendChild(deleteButton);
+
+    metersList.appendChild(listItem);
+});
+
+  } catch (error) {
+    console.error("Error loading registered meters:", error);
+    metersList.innerHTML = "<li>Error loading meters.</li>"; // Display error in the list
+    alert("Failed to load meters."); // Or a less intrusive way to display errors
+
+  }
 }
 
-
+// ... (Your deleteMeter function from the previous response should be defined here) ...
         // Load Recharge History (Chart)
         document.getElementById('loadRechargesButtonChart').addEventListener('click', loadRechargeHistoryChart);
 
