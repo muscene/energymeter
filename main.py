@@ -5,7 +5,8 @@ from flask import Flask, render_template, request, jsonify
 import joblib,sklearn,numpy
 import pandas as pd
 import requests
-
+import requests
+import urllib.parse
 app = Flask(__name__)
 loaded_model = joblib.load("optimized_customer_payment_model.pkl")  # Ensure this file exists
 
@@ -819,7 +820,7 @@ def consume():
             conn.close()
             return jsonify({"error": "Meter not found."}), 404
 
-        current_balance, owner_contact  = row
+        current_balance, phone  = row
 
         if current_balance <= 0:
             conn.close()
@@ -840,14 +841,26 @@ def consume():
         conn.close()
 
         # **Send SMS if balance is ≤ 1**
-        if new_balance <= 1 and owner_contact :
-            sms_message = f"Warning! Your energy meter balance is low: {new_balance} kWh. Please recharge soon."
-            sms_status = send_sms(owner_contact , sms_message)
-
-            if sms_status:
-                return jsonify({"message": "Recharge successful!", "new_balance": new_balance, "sms": "Sent"}), 200
-            else:
-                return jsonify({"message": "Recharge successful!", "new_balance": new_balance, "sms": "Failed"}), 200
+        if new_balance <= 1 and phone:
+           if phone:
+                sms_message = f"Dear Customer, your energy meter {serial_number} has been user 99% of your energy and  Remaining is  : {new_balance} kWh.  Please recahage"
+                
+                # Use the new SMS sending method
+                url = "https://vrt.rw/SMS/sms.php"
+                params = {
+                    "phone": phone,
+                    "message": sms_message
+                }
+                headers = {
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
+                }
+                
+                try:
+                    response = requests.get(url, params=params, headers=headers, verify=False)
+                    sms_result = "Sent" if response.status_code == 200 else "Failed"
+                except requests.exceptions.RequestException as e:
+                    print(f"SMS Sending Error: {e}")
+                    sms_result = "Failed"    
 
         return jsonify({"message": "Recharge successful!", "new_balance": new_balance}), 200
 
@@ -856,6 +869,21 @@ def consume():
 
     except Exception as e:
         return jsonify({"error": "Internal server error", "details": str(e)}), 500
+    
+SMS_API_URL = "https://vrt.rw/SMS/sms.php"
+
+def send_sms(phone, message):
+    encoded_message = urllib.parse.quote_plus(message)
+    sms_api_url = f"{SMS_API_URL}?phone={phone}&message={encoded_message}"
+
+    session = requests.Session()  # Use session for better handling
+    try:
+        response = session.get(sms_api_url, timeout=5)  # Add timeout
+        response.raise_for_status()  # Raise an error for bad responses
+        return "Sent" if response.status_code == 200 else f"Failed: {response.text}"
+    except requests.exceptions.RequestException as e:
+        return f"Failed: {str(e)}"
+
 @app.route('/api/delete/<serial_number>', methods=['DELETE'])
 def delete_meter(serial_number):
     conn = sqlite3.connect('energy_meter.db')
